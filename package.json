@@ -1,7 +1,7 @@
 {
   "name": "@pipeworx/mcp-us-elections",
-  "version": "0.1.0",
-  "description": "us-elections -- U.S. election results by county and precinct (fleet #2952).",
+  "version": "0.1.1",
+  "description": "us-elections -- U.S. election results by state, district, county and precinct (fleet #2952, extended fleet #2958).",
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -26,7 +26,7 @@
     "@cloudflare/workers-types": "^4.20260405.1"
   },
   "pipeworx": {
-    "sourceHash": "v1-5ed236e0b174a39455dd8c2f4e4c8a067b94288ba0c6d5f015eb6c73c60f7a69",
-    "sourceCommit": "c1590c25b5e94f477a53686cb61bd09cc196c1ee"
+    "sourceHash": "v1-fa3b780e17970ebb1ea571e9854c9e005202dd3f7cfa8e6954741dba8b3a6bfd",
+    "sourceCommit": "3723e46c6d115bd4a1fd2175e6bf758555e7cb50"
   }
 }

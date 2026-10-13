@@ -1,21 +1,23 @@
 /**
- * Reads for us-elections (fleet #2952).
+ * Reads for us-elections (fleet #2952, extended fleet #2958).
  *
  * Data: MIT Election Data + Science Lab (MEDSL), Harvard Dataverse --
  * STATE-level U.S. President and U.S. Senate returns, 1976-2024 (CC0 1.0,
- * doi:10.7910/DVN/42MVDX and doi:10.7910/DVN/PEJ5QU) -- plus OpenElections
+ * doi:10.7910/DVN/42MVDX and doi:10.7910/DVN/PEJ5QU) -- plus the Federal
+ * Election Commission's official DISTRICT-level House general-election
+ * results for 2020 and 2022 (public domain; House only -- MEDSL already
+ * covers Senate for those years, see load-data.mjs), plus OpenElections
  * (github.com/openelections) county/precinct-level 2024 general-election
- * results for Pennsylvania, Michigan and Georgia. Loaded into a D1 database
- * the gateway hands this pack as `_d1` (pack-manifest "d1Binding":
- * "US_ELECTIONS_DB") by scripts/us-elections/load-data.mjs -- never by a
- * deploy.
+ * results for 15 states. Loaded into a D1 database the gateway hands this
+ * pack as `_d1` (pack-manifest "d1Binding": "US_ELECTIONS_DB") by
+ * scripts/us-elections/load-data.mjs -- never by a deploy.
  *
  * KNOWN GAP, found 2026-10-12: MEDSL's own COUNTY-level presidential file
  * and its HOUSE district-level file are both gated behind a mandatory
  * Harvard Dataverse guestbook (name/email/institution/position) with no
- * API bypass. County/precinct coverage here comes from OpenElections for
- * three states only (PA, GA, MI) until that is resolved or more states are
- * added -- see README.md "Known gaps" and the loader's header comment.
+ * API bypass. The FEC's own official House-by-district file (ungated) is
+ * the replacement -- see README.md "Known gaps" and the loader's header
+ * comment for cycle coverage and county/precinct state list.
  */
 
 /** The slice of Cloudflare's D1Database this pack uses, declared here so the
@@ -144,8 +146,19 @@ export interface ResultsFilter {
   office: string;
   level: string;
   county?: string;
+  district?: string;
   limit: number;
   offset: number;
+}
+
+/** Normalize a House district to the 2-digit zero-padded form ("9" -> "09")
+ *  used consistently across sources (FEC pads, OpenElections does not).
+ *  Non-numeric codes (e.g. "AL" at-large markers some states use) pass through. */
+export function normalizeDistrict(input: unknown): string | null {
+  if (input == null) return null;
+  const s = String(input).trim();
+  if (!s || /^(n\/?a|none)$/i.test(s)) return null;
+  return /^\d+$/.test(s) ? s.padStart(2, '0') : s.toUpperCase();
 }
 
 export async function findResults(db: D1Like, f: ResultsFilter): Promise<ResultRow[]> {
@@ -155,9 +168,13 @@ export async function findResults(db: D1Like, f: ResultsFilter): Promise<ResultR
     where.push('county = ? COLLATE NOCASE');
     params.push(f.county);
   }
+  if (f.district) {
+    where.push('district = ? COLLATE NOCASE');
+    params.push(f.district);
+  }
   const sql = `SELECT state, state_po, year, office, district, level, county, precinct, candidate, party, candidatevotes, totalvotes, source_key, data_as_of
     FROM election_results WHERE ${where.join(' AND ')}
-    ORDER BY county, precinct, candidatevotes DESC
+    ORDER BY district, county, precinct, candidatevotes DESC
     LIMIT ? OFFSET ?`;
   params.push(f.limit, f.offset);
   const r = await db.prepare(sql).bind(...params).all<ResultRow>();
@@ -170,6 +187,10 @@ export async function countResults(db: D1Like, f: Omit<ResultsFilter, 'limit' | 
   if (f.county) {
     where.push('county = ? COLLATE NOCASE');
     params.push(f.county);
+  }
+  if (f.district) {
+    where.push('district = ? COLLATE NOCASE');
+    params.push(f.district);
   }
   const r = await db
     .prepare(`SELECT COUNT(*) AS n FROM election_results WHERE ${where.join(' AND ')}`)

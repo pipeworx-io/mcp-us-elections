@@ -25,14 +25,26 @@ interface McpToolExport {
 }
 
 /**
- * us-elections -- U.S. election results by county and precinct (fleet #2952).
+ * us-elections -- U.S. election results by state, district, county and
+ * precinct (fleet #2952, extended fleet #2958).
  *
- * Data: MIT Election Data + Science Lab (MEDSL), Harvard Dataverse --
- * STATE-level U.S. President and U.S. Senate returns, 1976-2024, CC0 1.0
- * (doi:10.7910/DVN/42MVDX, doi:10.7910/DVN/PEJ5QU) -- plus OpenElections
- * (github.com/openelections) COUNTY- and PRECINCT-level results for the
- * 2024 general election in Pennsylvania, Michigan and Georgia. The site
- * publishes bulk files only, so this pack builds a copy
+ * Data, three sources:
+ *  - MIT Election Data + Science Lab (MEDSL), Harvard Dataverse -- STATE-level
+ *    U.S. President and U.S. Senate returns, 1976-2024, CC0 1.0
+ *    (doi:10.7910/DVN/42MVDX, doi:10.7910/DVN/PEJ5QU).
+ *  - Federal Election Commission (fec.gov), "Federal Elections" statistical
+ *    publication -- official DISTRICT-level U.S. House general-election
+ *    results, public domain. Covers the 2020 and 2022 cycles; FEC has not
+ *    yet published a compiled 2024 edition (checked 2026-10-13 -- no
+ *    guestbook, just not released yet). HOUSE ONLY: the same workbook also
+ *    has a Senate sheet, deliberately not loaded -- MEDSL (above) already
+ *    covers Senate state-level for every year including 2020/2022, and
+ *    loading FEC's Senate sheet too would double-count every candidate
+ *    under election_race_summary (see load-data.mjs for the full story).
+ *  - OpenElections (github.com/openelections) -- COUNTY- and PRECINCT-level
+ *    results for the 2024 general election in 15 states (see README.md
+ *    "Coverage").
+ * All three publish bulk files only, so this pack builds a copy
  * (scripts/us-elections/load-data.mjs) into a D1 database the gateway hands
  * it as `_d1` (pack-manifest "d1Binding": "US_ELECTIONS_DB"). Design note:
  * this file + store.ts.
@@ -40,8 +52,9 @@ interface McpToolExport {
  * KNOWN GAP: MEDSL's own county-level presidential file and House
  * district-level file are both gated behind a mandatory Harvard Dataverse
  * guestbook (name/email/institution/position) with no API bypass -- see
- * README.md "Known gaps" and the loader's header comment. County/precinct
- * coverage is OpenElections-only, for three states, until that is resolved.
+ * README.md "Known gaps" and the loader's header comment. The FEC's official
+ * House-by-district data (above) is the ungated replacement for MEDSL's
+ * gated House file, for the cycles FEC has published so far (2020, 2022).
  *
  * Every response carries `source`, `source_url`, `license` and
  * `data_as_of` per row (election_results) or at the top level
@@ -55,6 +68,7 @@ import {
   findResults,
   getSources,
   listElections,
+  normalizeDistrict,
   raceSummary,
   requireDb,
   resolveOffice,
@@ -66,16 +80,17 @@ const tools: McpToolExport['tools'] = [
   {
     name: 'election_results',
     description:
-      'Candidate-level U.S. election results for one state, year and office, at state, county, or precinct granularity. State-level President and Senate cover every state 1976-2024 (MIT Election Data + Science Lab / MEDSL, Harvard Dataverse, CC0). County- and precinct-level President/Senate/House cover the 2024 general election in Pennsylvania, Michigan and Georgia only (OpenElections) -- this is the current limit of coverage, not a bug. Pass state as a postal code ("PA") or full name ("Pennsylvania"), office as "president", "senate" or "house". Use county to scope a county/precinct query (e.g. county="Allegheny"); omit it at level="county" to get every county in the state. Returns candidate, party, votes, the race total and the share of the vote, plus source/licence/data_as_of on every row. A state/year/office/level combination with no data returns a loud not-found (reason + available_levels hint), never an empty success.',
-    summary: 'Candidate-level election results by state/year/office at state, county or precinct granularity.',
+      'Candidate-level U.S. election results for one state, year and office, at state, county, or precinct granularity. State-level President and Senate cover every state 1976-2024, including 2020 and 2022 (MIT Election Data + Science Lab / MEDSL, Harvard Dataverse, CC0). Official FEC district-by-district U.S. House results (FEC, "Federal Elections" statistical publication, public domain) cover the 2020 and 2022 general elections nationwide -- FEC has not yet published its compiled 2024 edition, and House is not otherwise available nationwide (MEDSL\'s own House file is guestbook-gated). County-level President/Senate/House results (OpenElections, county/state election-board certified counts) cover the 2024 general election in Georgia, Mississippi, New Mexico, North Dakota, South Dakota, Tennessee, Utah, West Virginia, Colorado, Missouri, Oregon, South Carolina and Kentucky; Pennsylvania and Michigan additionally keep true precinct-level rows. Pass state as a postal code ("PA") or full name ("Pennsylvania"), office as "president", "senate" or "house". For a House race, pass district (e.g. "09") to scope one district; omit it to get every district returned for that state/year. Use county to scope a county/precinct query (e.g. county="Allegheny"); omit it at level="county" to get every county in the state. Returns candidate, party, votes, the race total and the share of the vote, plus source/licence/data_as_of on every row. A state/year/office/level combination with no data returns a loud not-found (reason + available_levels hint), never an empty success.',
+    summary: 'Candidate-level election results by state/year/office at state, county, precinct or House district.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         state: { type: 'string', description: 'US state, postal code ("PA") or full name ("Pennsylvania").' },
         year: { type: 'number', description: 'Election year, e.g. 2024.' },
         office: { type: 'string', description: '"president", "senate", or "house".' },
-        level: { type: 'string', description: 'Granularity: "state", "county", or "precinct". Default "county".' },
+        level: { type: 'string', description: 'Granularity: "state", "county", or "precinct". Default "county". FEC official House results are stored at level="state" (FEC publishes one final count per district, with no further sub-division).' },
         county: { type: 'string', description: 'County name to scope a county- or precinct-level query (case-insensitive). Optional.' },
+        district: { type: 'string', description: 'House district to scope to one race, e.g. "09" or "9" (normalized to 2 digits). Optional; only meaningful for office="house".' },
         limit: { type: 'number', description: 'Max rows, 1-500. Default 50. A truncated response carries truncated:true, total_matching, and a hint for narrowing (county, level="county").' },
         offset: { type: 'number', description: 'Pagination offset. Default 0.' },
       },
@@ -85,7 +100,7 @@ const tools: McpToolExport['tools'] = [
   {
     name: 'election_race_summary',
     description:
-      'Aggregated summary of a U.S. election race -- total votes, each candidate\'s vote share, the winner and the winning margin -- for one state/year/office. Uses the most aggregated level actually available for that race: a statewide number when MEDSL state-level data covers it (President/Senate, every state, 1976-2024), otherwise summed from whatever county/precinct detail exists (OpenElections: PA/MI/GA, 2024 only). For a district office (House) returns one summary per district. Use for "who won the 2024 PA Senate race and by how much" rather than reading every county row yourself.',
+      'Aggregated summary of a U.S. election race -- total votes, each candidate\'s vote share, the winner and the winning margin -- for one state/year/office. Uses the most aggregated level actually available for that race: a statewide/district number when MEDSL or FEC data covers it (President/Senate nationwide 1976-2024; House nationwide for 2020+2022 by FEC), otherwise summed from whatever county/precinct detail exists (OpenElections). For a district office (House) returns one summary per district. Use for "who won the 2024 PA Senate race and by how much" rather than reading every county row yourself.',
     summary: 'Totals, vote shares, winner and margin for a state/year/office race (one entry per district if applicable).',
     inputSchema: {
       type: 'object' as const,
@@ -151,10 +166,11 @@ async function electionResultsTool(db: D1Like, args: Record<string, unknown>) {
     };
   }
   const county = str(args.county) ?? undefined;
+  const district = normalizeDistrict(args.district) ?? undefined;
   const limit = clampInt(args.limit, 1, 500, 50);
   const offset = Math.max(0, Math.floor(Number(args.offset) || 0));
 
-  const filter = { state_po: resolvedState.state_po, year, office, level, county, limit, offset };
+  const filter = { state_po: resolvedState.state_po, year, office, level, county, district, limit, offset };
   const [rows, total, levels] = await Promise.all([
     findResults(db, filter),
     countResults(db, filter),
@@ -169,7 +185,7 @@ async function electionResultsTool(db: D1Like, args: Record<string, unknown>) {
       state_po: resolvedState.state_po,
       year,
       office,
-      message: `No ${office} results held for ${resolvedState.state} in ${year}. This pack covers state-level President/Senate nationwide 1976-2024, and county/precinct detail for PA, MI and GA (2024 general) only.`,
+      message: `No ${office} results held for ${resolvedState.state} in ${year}. Call list_elections to see what is actually covered nationwide.`,
       hint: 'Call list_elections to see what is actually covered.',
       data_as_of: asOf,
     };
@@ -184,7 +200,8 @@ async function electionResultsTool(db: D1Like, args: Record<string, unknown>) {
       office,
       level,
       county: county ?? null,
-      message: `No ${level}-level ${office} results held for ${resolvedState.state} in ${year}${county ? ` (county=${county})` : ''}. Levels actually available: ${levels.join(', ')}.`,
+      district: district ?? null,
+      message: `No ${level}-level ${office} results held for ${resolvedState.state} in ${year}${county ? ` (county=${county})` : ''}${district ? ` (district=${district})` : ''}. Levels actually available: ${levels.join(', ')}.`,
       available_levels: levels,
       data_as_of: asOf,
     };
@@ -200,6 +217,7 @@ async function electionResultsTool(db: D1Like, args: Record<string, unknown>) {
     office,
     level,
     county: county ?? null,
+    district: district ?? null,
     returned: rows.length,
     total_matching: total,
     truncated,
@@ -272,7 +290,7 @@ async function listElectionsTool(db: D1Like, args: Record<string, unknown>) {
     count: rows.length,
     elections: rows,
     coverage_note:
-      'State-level President and Senate cover every state, 1976-2024 (MEDSL, CC0). County/precinct detail currently covers Pennsylvania, Michigan and Georgia, 2024 general election only (OpenElections). More states are a planned extension.',
+      'State-level President and Senate cover every state, 1976-2024 (MEDSL, CC0). Official FEC district-level House results (public domain, the ungated nationwide alternative to MEDSL\'s gated House file) cover the 2020 and 2022 general elections nationwide -- FEC\'s compiled 2024 edition is not yet published. 2024 general county-level results (OpenElections) cover Georgia, Mississippi, New Mexico, North Dakota, South Dakota, Tennessee, Utah, West Virginia, Colorado, Missouri, Oregon, South Carolina and Kentucky (13 states); Pennsylvania and Michigan additionally keep true precinct-level rows. More states/years are a planned extension.',
     data_as_of: asOf,
   };
 }
