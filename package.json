@@ -1,0 +1,32 @@
+{
+  "name": "@pipeworx/mcp-us-elections",
+  "version": "0.1.0",
+  "description": "us-elections -- U.S. election results by county and precinct (fleet #2952).",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "bin": {
+    "mcp-us-elections": "bin/cli.js"
+  },
+  "keywords": ["mcp", "mcp-server", "model-context-protocol", "pipeworx", "us-elections"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pipeworx-io/mcp-us-elections.git"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@cloudflare/workers-types": "^4.20260405.1"
+  },
+  "pipeworx": {
+    "sourceHash": "v1-5ed236e0b174a39455dd8c2f4e4c8a067b94288ba0c6d5f015eb6c73c60f7a69",
+    "sourceCommit": "c1590c25b5e94f477a53686cb61bd09cc196c1ee"
+  }
+}

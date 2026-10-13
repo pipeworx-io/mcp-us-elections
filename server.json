@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.pipeworx-io/us-elections",
+  "title": "Us Elections",
+  "description": "us-elections -- U.S. election results by county and precinct (fleet #2952).",
+  "version": "0.1.0",
+  "websiteUrl": "https://pipeworx.io/packs/us-elections",
+  "repository": {
+    "url": "https://github.com/pipeworx-io/mcp-us-elections",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://gateway.pipeworx.io/us-elections/mcp"
+    }
+  ]
+}
