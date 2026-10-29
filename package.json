@@ -1,12 +1,20 @@
 {
   "name": "@pipeworx/mcp-us-elections",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "us-elections -- U.S. election results by state, district, county and precinct (fleet #2952, extended fleet #2958).",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./tools.json": "./tools.json",
+    "./package.json": "./package.json"
+  },
   "bin": {
     "mcp-us-elections": "bin/cli.js"
+  },
+  "files": ["bin/", "lib/", "tools.json", "server.json"],
+  "engines": {
+    "node": ">=18"
   },
   "keywords": ["mcp", "mcp-server", "model-context-protocol", "pipeworx", "us-elections"],
   "license": "MIT",
@@ -14,19 +22,12 @@
     "type": "git",
     "url": "git+https://github.com/pipeworx-io/mcp-us-elections.git"
   },
-  "scripts": {
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
-    "tsx": "^4.19.0"
-  },
-  "devDependencies": {
-    "typescript": "^5.9.3",
-    "@cloudflare/workers-types": "^4.20260405.1"
-  },
+  "mcpName": "io.github.pipeworx-io/us-elections",
   "pipeworx": {
-    "sourceHash": "v1-fa3b780e17970ebb1ea571e9854c9e005202dd3f7cfa8e6954741dba8b3a6bfd",
-    "sourceCommit": "3723e46c6d115bd4a1fd2175e6bf758555e7cb50"
+    "mode": "gateway",
+    "slug": "us-elections",
+    "gatewaySlug": "us-elections",
+    "sourceHash": "v1-7117fa7ec1169c7d08cfb0bd3b110194fa5cd07fa5bd5290dcb0f63e2ad35575",
+    "sourceCommit": "98853f34516646cb7c4c1460f09249b262c0269e"
   }
 }
