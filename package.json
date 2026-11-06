@@ -1,6 +1,6 @@
 {
   "name": "@pipeworx/mcp-us-elections",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "us-elections -- U.S. election results by state, district, county and precinct (fleet #2952, extended fleet #2958).",
   "type": "module",
   "main": "lib/index.js",
@@ -27,7 +27,7 @@
     "mode": "gateway",
     "slug": "us-elections",
     "gatewaySlug": "us-elections",
-    "sourceHash": "v1-7117fa7ec1169c7d08cfb0bd3b110194fa5cd07fa5bd5290dcb0f63e2ad35575",
-    "sourceCommit": "98853f34516646cb7c4c1460f09249b262c0269e"
+    "sourceHash": "v1-1cb612cb158e97e4dc24383543985f54cc9ceea8e069413613870a933037f2b0",
+    "sourceCommit": "ca52e7ed1e1ccad897c2da1b0fa105edc0bc3b2e"
   }
 }
